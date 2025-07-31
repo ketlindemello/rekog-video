@@ -1,0 +1,80 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Animal Video Processing Pipeline with Rekognition and Step Functions
+
+Globals:
+  Function:
+    Runtime: python3.11
+    Timeout: 900
+    MemorySize: 1024
+
+Resources:
+
+  StartLabelDetectionFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: StartLabelDetectionLambda
+      Handler: app.lambda_handler
+      CodeUri: start_label_detection/
+      Policies:
+        - RekognitionFullAccess
+        - S3ReadPolicy:
+            BucketName: awsimageshop
+
+  GetLabelDetectionResultsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: GetLabelDetectionResultsLambda
+      Handler: app.lambda_handler
+      CodeUri: get_label_detection_results/
+      Policies:
+        - RekognitionFullAccess
+        - S3ReadPolicy:
+            BucketName: awsimageshop
+
+  ExtractAnimalFrameFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: ExtractAnimalFrameLambda
+      Handler: app.lambda_handler
+      CodeUri: extract_animal_frame/
+      Policies:
+        - RekognitionFullAccess
+        - S3ReadPolicy:
+            BucketName: awsimageshop
+        - S3WritePolicy:
+            BucketName: my-output-images
+      Layers:
+        - arn:aws:lambda:us-east-1:146318645305:layer:ffmpeg:4  # Example FFmpeg Lambda layer for us-east-1
+
+  AnimalVideoStepFunction:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      Name: AnimalVideoStepFunction
+      DefinitionUri: statemachine/animal_video_pipeline.asl.json
+      Role:
+        Fn::GetAtt: [ AnimalVideoStepFunctionRole, Arn ]
+
+  AnimalVideoStepFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: states.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: AllowLambdaInvoke
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource: "*"
+
+Outputs:
+  StepFunctionArn:
+    Value: !Ref AnimalVideoStepFunction

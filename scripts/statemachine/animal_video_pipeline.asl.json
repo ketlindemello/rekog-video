@@ -1,0 +1,60 @@
+{
+  "Comment": "Rekognition Video Animal Detection Pipeline",
+  "StartAt": "Start Label Detection",
+  "States": {
+    "Start Label Detection": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:489554620994:function:StartLabelDetectionLambda",
+      "Next": "Wait for Processing"
+    },
+    "Wait for Processing": {
+      "Type": "Wait",
+      "Seconds": 30,
+      "Next": "Get Label Detection Results"
+    },
+    "Get Label Detection Results": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-east-1:489554620994:function:GetLabelDetectionResultsLambda",
+      "Next": "Check Job Status"
+    },
+    "Check Job Status": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.JobStatus",
+          "StringEquals": "SUCCEEDED",
+          "Next": "Extract Frames"
+        },
+        {
+          "Variable": "$.JobStatus",
+          "StringEquals": "FAILED",
+          "Next": "Fail State"
+        }
+      ],
+      "Default": "Wait for Processing"
+    },
+    "Extract Frames": {
+      "Type": "Map",
+      "ItemsPath": "$.AnimalDetections",
+      "Iterator": {
+        "StartAt": "Extract Animal Frame",
+        "States": {
+          "Extract Animal Frame": {
+            "Type": "Task",
+            "Resource": "arn:aws:lambda:us-east-1:489554620994:function:ExtractAnimalFrameLambda",
+            "End": true
+          }
+        }
+      },
+      "Next": "Success State"
+    },
+    "Success State": {
+      "Type": "Succeed"
+    },
+    "Fail State": {
+      "Type": "Fail",
+      "Error": "RekognitionJobFailed",
+      "Cause": "The Rekognition job failed."
+    }
+  }
+}

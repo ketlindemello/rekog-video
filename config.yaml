@@ -1,0 +1,78 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Resources:
+  # Define the S3 bucket
+  AwsImageShopBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: awsimageshop # Replace with a unique bucket name
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: LambdaS3RekognitionAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: arn:aws:logs:*:*:*
+              - Effect: Allow
+                Action:
+                  - s3:*
+                Resource:
+                  - arn:aws:s3:::awsimageshop
+                  - arn:aws:s3:::awsimageshop/*
+              - Effect: Allow
+                Action:
+                  - rekognition:DetectFaces
+                  - rekognition:DetectLabels
+                  - rekognition:CompareFaces
+                Resource: "*"
+
+  MyLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: imagerecognitionlambda
+      Runtime: python3.12
+      Handler: handler.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 300
+      Code:
+        S3Bucket: cloud-formation-serverless-deployments
+        S3Key: lambdas/imagerecognitionlambda/imagegenrecog-1.0.zip
+#      Events:
+#        # Define the S3 trigger
+#        ObjectCreated:
+#          Type: S3
+#          Properties:
+#            Bucket: !Ref AwsImageShopBucket # Reference the S3 bucket defined below
+#            Events: s3:ObjectCreated:Put
+#            Filter:
+#              S3Key:
+#                Rules:
+#                  - Name: prefix
+#                    Value: image_incoming/
+#                  - Name: suffix
+#                    Value: .jpg
+
+
+
+Outputs:
+  BucketName:
+    Description: "S3 bucket used for image uploads"
+    Value: !Ref AwsImageShopBucket
+
+  LambdaFunctionName:
+    Description: "Name of the Lambda function"
+    Value: !Ref MyLambdaFunction
